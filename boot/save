@@ -1,0 +1,213 @@
+
+global _start
+%define VIDEO_SEG 0xB8000
+%define MAX_LINE 25
+%define XCOLOR 0x07
+%define MAX_COL 80
+%define cursorX 0
+%define cursorY 0
+
+jmp _start
+
+print:
+	push ebp
+	mov ebp, esp
+	push eax
+	push edi
+	push esi
+	push ebx
+	push ecx
+	push edx
+
+	mov esi, [ebp+8]
+	mov edi, VIDEO_SEG
+
+	;to determine position of character we 're doing do
+	;pos = cursorY*2*MAX_COL+2*cursorX
+	
+	.pos:
+		;clean register
+
+		xor eax, eax
+		xor ecx, ecx
+		xor ebx, ebx
+		xor edx, edx
+		
+		;here we're going do cursorY*2*MAX_COL
+
+		mov al, byte [cursorY]
+		shl ax, 1
+		mov cx, MAX_COL
+		mul cx
+		mov ebx, edx
+		shl ebx, 16
+		or bx, ax 
+
+		;then we 're going add 2*cursorX
+		
+		xor ecx, ecx
+		xor eax, eax
+		mov al, byte [cursorX]
+		mov cl,2
+		mov eax, ebx
+		add edi, eax 
+
+	.do_write:
+		cmp byte [esi],0xa
+		je .new_line
+		cmp byte [esi],0x0
+		je .done
+		mov al,  byte [esi]
+		mov byte [edi], al
+		mov byte [edi+1], XCOLOR
+		cmp byte [cursorX],160
+		je .new_line
+
+	.next:
+		inc byte [cursorX]
+		inc esi
+		jmp .pos
+
+	.new_line:
+		inc byte [cursorY]
+		mov byte [cursorX], 0
+		jmp .do_write
+	.done:
+		pop edx
+		pop ecx
+		pop ebx
+		pop esi
+		pop edi
+		pop eax
+		pop ebp
+		ret
+
+
+_start:
+
+	mov byte [VIDEO_SEG], 'h'
+	mov byte [VIDEO_SEG+1], 0x07
+	mov byte [VIDEO_SEG+2], 'e'
+	mov byte [VIDEO_SEG+3], 0x07
+	mov byte [VIDEO_SEG+4], 'l'
+	mov byte [VIDEO_SEG+5], 0x07
+	mov byte [VIDEO_SEG+6], 'l'
+	mov byte [VIDEO_SEG+7], 0x07
+	mov byte [VIDEO_SEG+8], 'o'
+	mov byte [VIDEO_SEG+9], 0x07
+	
+	push msg
+	call print
+e:
+	jmp e
+msg db 'test is ok',10,0
+
+
+///////////////////////////////
+
+
+
+global getChar, print
+
+%define VIDEO_SEG 0xB8000
+%define MAX_LINE 25
+%define XCOLOR 0x07
+%define MAX_COL 80
+
+getChar:
+	push ebp
+	mov ebp, esp
+	push eax
+	
+	xor edx, edx
+	mov edx, [ebp+8]
+	mov edi, VIDEO_SEG
+
+	;to determine position of character we 're doing do
+	;pos = cursorY*2*MAX_COL+2*cursorX
+	
+	.pos:
+		;clean register
+
+		xor eax, eax
+		xor ecx, ecx
+		xor ebx, ebx
+
+		
+		;here we're going do cursorY*2*MAX_COL
+
+		mov al, byte [cursorY]
+		mov cl, MAX_COL*2
+		mul cl
+		mov bx, ax 
+
+		;then we 're going add 2*cursorX
+		
+		xor ecx, ecx
+		xor eax, eax
+
+		mov al, byte [cursorX]
+		mov cl, 2
+		mov eax, ebx
+
+		add edi, eax 
+
+	.do_write:
+		cmp dl, 10
+		je .new_line
+		cmp dl, 0
+		je .done
+		
+		mov byte [edi], dl
+		mov byte [edi+1], XCOLOR
+		cmp byte [cursorX],160
+		je .new_line
+
+		inc byte [cursorX]
+		jmp .done
+
+	.new_line:
+		inc byte [cursorY]
+		mov byte [cursorX], 0
+
+	.done:
+		pop edx
+		pop ecx
+		pop ebx
+		pop esi
+		pop edi
+		pop eax
+		pop ebp
+	ret
+
+print:
+	push ebp
+	mov ebp, esp
+	push esi
+	push eax
+	xor eax, eax
+	xor esi, esi
+	mov esi, [ebp+8]
+	
+	.loop_char:
+		mov al, byte [esi]
+		cmp al, 0
+		je .done
+		
+		push eax
+		call getChar
+		pop eax
+		inc edi
+		jmp .loop_char
+
+	.done:
+		pop eax
+		pop esi
+		pop ebp
+	ret
+
+
+cursorX db 0
+cursorY db 0
+video db 0
+charElem db 0
